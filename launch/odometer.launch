@@ -1,13 +1,15 @@
 <launch>
-  <!-- Use simulated time if playing a bag file -->
   <param name="use_sim_time" value="true" />
-
-  <!-- Odometer node -->
+  
+  <!-- Odometer from speed & steering -->
   <node name="odometer_node" pkg="first_project" type="odometer" output="screen" />
 
-  <!-- Path publisher node -->
-  <node name="path_node" pkg="first_project" type="odom_path_publisher" output="screen" />
+  <!-- Path drawer from GPS odometry -->
+  <node name="gps_path_node" pkg="first_project" type="gps_path_publisher" output="screen" />
 
-  <!-- (Optional) Launch RViz with config -->
+  <!-- Odometer from GPS -->
+  <node name="gps_odom_node" pkg="first_project" type="gps_odometer" output="screen" />
+  
+  <!-- RViz -->
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/odom_view.rviz" />
 </launch>
