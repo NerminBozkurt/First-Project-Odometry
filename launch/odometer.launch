@@ -1,0 +1,13 @@
+<launch>
+  <!-- Use simulated time if playing a bag file -->
+  <param name="use_sim_time" value="true" />
+
+  <!-- Odometer node -->
+  <node name="odometer_node" pkg="first_project" type="odometer" output="screen" />
+
+  <!-- Path publisher node -->
+  <node name="path_node" pkg="first_project" type="odom_path_publisher" output="screen" />
+
+  <!-- (Optional) Launch RViz with config -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/odom_view.rviz" />
+</launch>

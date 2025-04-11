@@ -56,11 +56,23 @@ public:
         pos_x_prev = pos_x;
         pos_y_prev = pos_y;
 
-        transform.setOrigin(tf::Vector3(speed_long, speed_lat, 0));
-        q.setRPY(0, 0, omega);
-        transform.setRotation(q);
-        // Publish the updated transform
-        br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", "car"));
+        geometry_msgs::TransformStamped tf_msg;
+        tf_msg.header.stamp = ros::Time::now();
+        tf_msg.header.frame_id = "odom";
+        tf_msg.child_frame_id = "base_link";
+
+        tf_msg.transform.translation.x = pos_x;
+        tf_msg.transform.translation.y = pos_y;
+        tf_msg.transform.translation.z = 0.0;
+
+        tf::Quaternion quat = tf::createQuaternionFromYaw(theta);
+        tf_msg.transform.rotation.x = quat.x();
+        tf_msg.transform.rotation.y = quat.y();
+        tf_msg.transform.rotation.z = quat.z();
+        tf_msg.transform.rotation.w = quat.w();
+
+        br.sendTransform(tf_msg);
+
     }
 
     void callback1(const ros::TimerEvent&)
