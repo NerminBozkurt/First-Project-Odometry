@@ -4,9 +4,6 @@
   <!-- Odometer from speed & steering -->
   <node name="odometer_node" pkg="first_project" type="odometer" output="screen" />
 
-  <!-- Path drawer from GPS odometry -->
-  <node name="gps_path_node" pkg="first_project" type="gps_path_publisher" output="screen" />
-
   <!-- Odometer from GPS -->
   <node name="gps_odom_node" pkg="first_project" type="gps_odometer" output="screen">
     <param name="lat_r" value="45.618932386592405" />

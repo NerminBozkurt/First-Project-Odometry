@@ -146,10 +146,6 @@ target_link_libraries(odom_path_publisher ${catkin_LIBRARIES})
 add_executable(gps_odometer src/gps_odometer.cpp)
 target_link_libraries(gps_odometer ${catkin_LIBRARIES})
 
-add_executable(gps_path_publisher src/gps_path_publisher.cpp)
-target_link_libraries(gps_path_publisher ${catkin_LIBRARIES})
-
-
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

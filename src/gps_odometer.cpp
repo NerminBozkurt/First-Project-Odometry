@@ -1,32 +1,43 @@
 #include <ros/ros.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_broadcaster.h>
 #include <math.h>
 
 class GpsOdometer {
 public:
     GpsOdometer(ros::NodeHandle& nh) {
-        // Load parameters from launch file
+        // Load reference point from parameters
         nh.param("lat_r", lat_ref_, 0.0);
         nh.param("lon_r", lon_ref_, 0.0);
         nh.param("alt_r", alt_ref_, 0.0);
-
         geodeticToECEF(lat_ref_, lon_ref_, alt_ref_, Xr_, Yr_, Zr_);
         ROS_INFO("Reference set from parameters: lat=%.6f lon=%.6f alt=%.2f", lat_ref_, lon_ref_, alt_ref_);
 
         fix_sub_ = nh.subscribe("/swiftnav/front/gps_pose", 1, &GpsOdometer::gpsCallback, this);
         odom_pub_ = nh.advertise<nav_msgs::Odometry>("/gps_odom", 1);
+        path_pub_ = nh.advertise<nav_msgs::Path>("/gps_path", 1);
+
+        path_.header.frame_id = "odom";
+        has_last_ = false;
     }
 
 private:
     ros::Subscriber fix_sub_;
     ros::Publisher odom_pub_;
+    ros::Publisher path_pub_;
     tf::TransformBroadcaster tf_broadcaster_;
+    nav_msgs::Path path_;
 
     // Reference point
     double lat_ref_, lon_ref_, alt_ref_;
     double Xr_, Yr_, Zr_;
+
+    // Last point for jump filtering
+    double last_x_, last_y_, last_z_;
+    bool has_last_;
 
     void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         if (msg->status.status < sensor_msgs::NavSatStatus::STATUS_FIX) {
@@ -40,6 +51,23 @@ private:
         double x, y, z;
         ecefToENU(Xp, Yp, Zp, x, y, z);
 
+        // Check for sudden jumps > 100 meters
+        if (has_last_) {
+            double dx = x - last_x_;
+            double dy = y - last_y_;
+            double dz = z - last_z_;
+            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist > 100.0) {
+                ROS_WARN_THROTTLE(5, "Skipping large odometry jump: %.1f meters", dist);
+                return;
+            }
+        }
+
+        last_x_ = x;
+        last_y_ = y;
+        last_z_ = z;
+        has_last_ = true;
+
         nav_msgs::Odometry odom;
         odom.header.stamp = msg->header.stamp;
         odom.header.frame_id = "odom";
@@ -47,16 +75,23 @@ private:
         odom.pose.pose.position.x = x;
         odom.pose.pose.position.y = y;
         odom.pose.pose.position.z = z;
-        odom.pose.pose.orientation.w = 1.0; // no heading yet
+        odom.pose.pose.orientation.w = 1.0;
 
         odom_pub_.publish(odom);
 
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, z));
         tf::Quaternion q;
-        q.setRPY(0, 0, 0);  // no heading yet
+        q.setRPY(0, 0, 0);  // heading will be added later
         transform.setRotation(q);
         tf_broadcaster_.sendTransform(tf::StampedTransform(transform, msg->header.stamp, "odom", "gps"));
+
+        geometry_msgs::PoseStamped pose;
+        pose.header = odom.header;
+        pose.pose = odom.pose.pose;
+        path_.poses.push_back(pose);
+        path_.header.stamp = msg->header.stamp;
+        path_pub_.publish(path_);
     }
 
     void geodeticToECEF(double lat, double lon, double alt, double& X, double& Y, double& Z) {
