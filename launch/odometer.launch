@@ -13,5 +13,6 @@
   </node>
   
   <!-- RViz -->
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/odom_view.rviz" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/gps_odometry_config.rviz" />
+
 </launch>
