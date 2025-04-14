@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(first_project)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -10,6 +10,7 @@ project(first_project)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
+  sensor_msgs
   geometry_msgs
   roscpp_serialization
   nav_msgs
@@ -18,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
+catkin_package()
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -138,6 +139,13 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(odometer src/odometer.cpp)
 target_link_libraries(odometer ${catkin_LIBRARIES})
+
+add_executable(odom_path_publisher src/odom_path_publisher.cpp)
+target_link_libraries(odom_path_publisher ${catkin_LIBRARIES})
+
+add_executable(gps_odometer src/gps_odometer.cpp)
+target_link_libraries(gps_odometer ${catkin_LIBRARIES})
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

@@ -1,128 +1,157 @@
 #include <ros/ros.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
+#include <nav_msgs/Path.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_broadcaster.h>
-#include <cmath>
-
-#define DEG2RAD M_PI / 180.0
-#define EARTH_A 6378137.0
-#define EARTH_B 6356752.3142
-#define EARTH_E2 ((EARTH_A * EARTH_A - EARTH_B * EARTH_B) / (EARTH_A * EARTH_A))
+#include <tf/transform_datatypes.h>
+#include <math.h>
 
 class GpsOdometer {
 public:
-    GpsOdometer() : nh_(), pnh_("~"), ref_set_(false) {
-        pnh_.param("lat_r", lat_r_, 0.0);
-        pnh_.param("lon_r", lon_r_, 0.0);
-        pnh_.param("alt_r", alt_r_, 0.0);
-        if (lat_r_ != 0.0 || lon_r_ != 0.0 || alt_r_ != 0.0) {
-            ref_set_ = true;
-            lla_to_ecef(lat_r_, lon_r_, alt_r_, x0_, y0_, z0_);
-        }
+    GpsOdometer(ros::NodeHandle& nh) {
+        nh.param("lat_r", lat_ref_, 0.0);
+        nh.param("lon_r", lon_ref_, 0.0);
+        nh.param("alt_r", alt_ref_, 0.0);
+        geodeticToECEF(lat_ref_, lon_ref_, alt_ref_, Xr_, Yr_, Zr_);
+        ROS_INFO("Reference set from parameters: lat=%.6f lon=%.6f alt=%.2f", lat_ref_, lon_ref_, alt_ref_);
 
-        sub_ = nh_.subscribe("/swiftnav/front/gps_pose", 1000, &GpsOdometer::callback, this);
-        pub_ = nh_.advertise<nav_msgs::Odometry>("/gps_odom", 10);
-    }
+        fix_sub_ = nh.subscribe("/swiftnav/front/gps_pose", 1, &GpsOdometer::gpsCallback, this);
+        odom_pub_ = nh.advertise<nav_msgs::Odometry>("/gps_odom", 1);
+        path_pub_ = nh.advertise<nav_msgs::Path>("/gps_path", 1);
 
-    void callback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
-        if (msg->status.status < 0) return; // invalid fix
-
-        double x, y, z;
-        lla_to_ecef(msg->latitude, msg->longitude, msg->altitude, x, y, z);
-
-        if (!ref_set_) {
-            x0_ = x;
-            y0_ = y;
-            z0_ = z;
-            lat_r_ = msg->latitude;
-            lon_r_ = msg->longitude;
-            alt_r_ = msg->altitude;
-            ref_set_ = true;
-            return;
-        }
-
-        double enu_x, enu_y, enu_z;
-        ecef_to_enu(x, y, z, enu_x, enu_y, enu_z);
-
-        ros::Time stamp = msg->header.stamp;
-
-        // Calculate heading if we have previous ENU
-        double yaw = 0.0;
-        if (has_prev_) {
-            double dx = enu_x - prev_x_;
-            double dy = enu_y - prev_y_;
-            if (dx != 0.0 || dy != 0.0)
-                yaw = std::atan2(dy, dx);
-        }
-
-        has_prev_ = true;
-        prev_x_ = enu_x;
-        prev_y_ = enu_y;
-
-        geometry_msgs::Quaternion quat = tf::createQuaternionMsgFromYaw(yaw);
-
-        nav_msgs::Odometry odom;
-        odom.header.stamp = stamp;
-        odom.header.frame_id = "odom";
-        odom.child_frame_id = "gps_link";
-        odom.pose.pose.position.x = enu_x;
-        odom.pose.pose.position.y = enu_y;
-        odom.pose.pose.position.z = enu_z;
-        odom.pose.pose.orientation = quat;
-
-        pub_.publish(odom);
-
-        geometry_msgs::TransformStamped tf_msg;
-        tf_msg.header.stamp = stamp;
-        tf_msg.header.frame_id = "odom";
-        tf_msg.child_frame_id = "gps_link";
-        tf_msg.transform.translation.x = enu_x;
-        tf_msg.transform.translation.y = enu_y;
-        tf_msg.transform.translation.z = enu_z;
-        tf_msg.transform.rotation = quat;
-
-        tf_broadcaster_.sendTransform(tf_msg);
+        path_.header.frame_id = "odom";
+        has_last_ = false;
     }
 
 private:
-    ros::NodeHandle nh_, pnh_;
-    ros::Subscriber sub_;
-    ros::Publisher pub_;
+    ros::Subscriber fix_sub_;
+    ros::Publisher odom_pub_;
+    ros::Publisher path_pub_;
     tf::TransformBroadcaster tf_broadcaster_;
+    nav_msgs::Path path_;
 
-    double lat_r_, lon_r_, alt_r_;
-    double x0_, y0_, z0_;
-    bool ref_set_;
+    // Reference point
+    double lat_ref_, lon_ref_, alt_ref_;
+    double Xr_, Yr_, Zr_;
 
-    double prev_x_ = 0.0, prev_y_ = 0.0;
-    bool has_prev_ = false;
+    // Last point
+    double last_x_, last_y_, last_z_;
+    bool has_last_;
 
-    void lla_to_ecef(double lat, double lon, double alt, double& x, double& y, double& z) {
-        lat *= DEG2RAD;
-        lon *= DEG2RAD;
-        double N = EARTH_A / sqrt(1.0 - EARTH_E2 * sin(lat) * sin(lat));
-        x = (N + alt) * cos(lat) * cos(lon);
-        y = (N + alt) * cos(lat) * sin(lon);
-        z = (N * (1 - EARTH_E2) + alt) * sin(lat);
+    void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
+        if (msg->status.status < sensor_msgs::NavSatStatus::STATUS_FIX) {
+            ROS_WARN_THROTTLE(5, "No GPS fix yet");
+            return;
+        }
+
+        // Convert GPS to ECEF → ENU
+        double Xp, Yp, Zp;
+        geodeticToECEF(msg->latitude, msg->longitude, msg->altitude, Xp, Yp, Zp);
+
+        double x, y, z;
+        ecefToENU(Xp, Yp, Zp, x, y, z);
+
+        // Filter large jumps
+        if (has_last_) {
+            double dx = x - last_x_;
+            double dy = y - last_y_;
+            double dz = z - last_z_;
+            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (dist > 100.0) {
+                ROS_WARN_THROTTLE(5, "Skipping large odometry jump: %.1f meters", dist);
+                return;
+            }
+        }
+
+        // Estimate heading (yaw)
+        double yaw = 0.0;
+        if (has_last_) {
+            double dx = x - last_x_;
+            double dy = y - last_y_;
+            if (std::hypot(dx, dy) > 1e-2) {
+                yaw = std::atan2(dy, dx);
+            }
+            ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
+
+        }
+
+        // Update last position
+        last_x_ = x;
+        last_y_ = y;
+        last_z_ = z;
+        has_last_ = true;
+
+        // Create quaternion from yaw
+        tf::Quaternion q;
+        q.setRPY(0, 0, yaw);
+        q.normalize();
+
+        // Publish odometry
+        nav_msgs::Odometry odom;
+        odom.header.stamp = msg->header.stamp;
+        odom.header.frame_id = "odom";
+        odom.child_frame_id = "gps";
+        odom.pose.pose.position.x = x;
+        odom.pose.pose.position.y = y;
+        odom.pose.pose.position.z = z;
+        odom.pose.pose.orientation.x = q.x();
+        odom.pose.pose.orientation.y = q.y();
+        odom.pose.pose.orientation.z = q.z();
+        odom.pose.pose.orientation.w = q.w();
+        odom_pub_.publish(odom);
+
+        // Broadcast TF
+        tf::Transform transform;
+        transform.setOrigin(tf::Vector3(x, y, z));
+        transform.setRotation(q);
+        tf_broadcaster_.sendTransform(tf::StampedTransform(transform, msg->header.stamp, "odom", "gps"));
+
+        // Append to path
+        geometry_msgs::PoseStamped pose;
+        pose.header = odom.header;
+        pose.pose = odom.pose.pose;
+        path_.poses.push_back(pose);
+        path_.header.stamp = msg->header.stamp;
+        path_pub_.publish(path_);
     }
 
-    void ecef_to_enu(double x, double y, double z, double& enu_x, double& enu_y, double& enu_z) {
-        double lat = lat_r_ * DEG2RAD;
-        double lon = lon_r_ * DEG2RAD;
+    void geodeticToECEF(double lat, double lon, double alt, double& X, double& Y, double& Z) {
+        double a = 6378137.0;
+        double b = 6356752.0;
+        double e_sq = 1 - (b * b) / (a * a);
 
-        double dx = x - x0_;
-        double dy = y - y0_;
-        double dz = z - z0_;
+        double phi = lat * M_PI / 180.0;
+        double lambda = lon * M_PI / 180.0;
+        double sin_phi = sin(phi), cos_phi = cos(phi);
+        double sin_lambda = sin(lambda), cos_lambda = cos(lambda);
+        double N = a / sqrt(1 - e_sq * sin_phi * sin_phi);
 
-        enu_x = -sin(lon) * dx + cos(lon) * dy;
-        enu_y = -sin(lat) * cos(lon) * dx - sin(lat) * sin(lon) * dy + cos(lat) * dz;
-        enu_z = cos(lat) * cos(lon) * dx + cos(lat) * sin(lon) * dy + sin(lat) * dz;
+        X = (N + alt) * cos_phi * cos_lambda;
+        Y = (N + alt) * cos_phi * sin_lambda;
+        Z = (N * (1 - e_sq) + alt) * sin_phi;
+    }
+
+    void ecefToENU(double Xp, double Yp, double Zp, double& x, double& y, double& z) {
+        double phi = lat_ref_ * M_PI / 180.0;
+        double lambda = lon_ref_ * M_PI / 180.0;
+        double sin_phi = sin(phi), cos_phi = cos(phi);
+        double sin_lambda = sin(lambda), cos_lambda = cos(lambda);
+
+        double dx = Xp - Xr_;
+        double dy = Yp - Yr_;
+        double dz = Zp - Zr_;
+
+        x = -sin_lambda * dx + cos_lambda * dy;
+        y = -sin_phi * cos_lambda * dx - sin_phi * sin_lambda * dy + cos_phi * dz;
+        z = cos_phi * cos_lambda * dx + cos_phi * sin_lambda * dy + sin_phi * dz;
     }
 };
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "gps_odometer");
-    GpsOdometer node;
+    ros::NodeHandle nh("~");
+    GpsOdometer node(nh);
     ros::spin();
     return 0;
 }
