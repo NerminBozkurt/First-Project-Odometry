@@ -4,12 +4,12 @@
 #include <nav_msgs/Path.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_datatypes.h>
 #include <math.h>
 
 class GpsOdometer {
 public:
     GpsOdometer(ros::NodeHandle& nh) {
-        // Load reference point from parameters
         nh.param("lat_r", lat_ref_, 0.0);
         nh.param("lon_r", lon_ref_, 0.0);
         nh.param("alt_r", alt_ref_, 0.0);
@@ -35,7 +35,7 @@ private:
     double lat_ref_, lon_ref_, alt_ref_;
     double Xr_, Yr_, Zr_;
 
-    // Last point for jump filtering
+    // Last point
     double last_x_, last_y_, last_z_;
     bool has_last_;
 
@@ -45,13 +45,14 @@ private:
             return;
         }
 
+        // Convert GPS to ECEF → ENU
         double Xp, Yp, Zp;
         geodeticToECEF(msg->latitude, msg->longitude, msg->altitude, Xp, Yp, Zp);
 
         double x, y, z;
         ecefToENU(Xp, Yp, Zp, x, y, z);
 
-        // Check for sudden jumps > 100 meters
+        // Filter large jumps
         if (has_last_) {
             double dx = x - last_x_;
             double dy = y - last_y_;
@@ -63,11 +64,30 @@ private:
             }
         }
 
+        // Estimate heading (yaw)
+        double yaw = 0.0;
+        if (has_last_) {
+            double dx = x - last_x_;
+            double dy = y - last_y_;
+            if (std::hypot(dx, dy) > 1e-2) {
+                yaw = std::atan2(dy, dx);
+            }
+            ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
+
+        }
+
+        // Update last position
         last_x_ = x;
         last_y_ = y;
         last_z_ = z;
         has_last_ = true;
 
+        // Create quaternion from yaw
+        tf::Quaternion q;
+        q.setRPY(0, 0, yaw);
+        q.normalize();
+
+        // Publish odometry
         nav_msgs::Odometry odom;
         odom.header.stamp = msg->header.stamp;
         odom.header.frame_id = "odom";
@@ -75,17 +95,19 @@ private:
         odom.pose.pose.position.x = x;
         odom.pose.pose.position.y = y;
         odom.pose.pose.position.z = z;
-        odom.pose.pose.orientation.w = 1.0;
-
+        odom.pose.pose.orientation.x = q.x();
+        odom.pose.pose.orientation.y = q.y();
+        odom.pose.pose.orientation.z = q.z();
+        odom.pose.pose.orientation.w = q.w();
         odom_pub_.publish(odom);
 
+        // Broadcast TF
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, z));
-        tf::Quaternion q;
-        q.setRPY(0, 0, 0);  // heading will be added later
         transform.setRotation(q);
         tf_broadcaster_.sendTransform(tf::StampedTransform(transform, msg->header.stamp, "odom", "gps"));
 
+        // Append to path
         geometry_msgs::PoseStamped pose;
         pose.header = odom.header;
         pose.pose = odom.pose.pose;
