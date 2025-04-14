@@ -21,7 +21,7 @@ public:
         path_pub_ = nh.advertise<nav_msgs::Path>("/gps_path", 1);
 
         path_.header.frame_id = "odom";
-        has_last_ = false;
+        is_first_ = true;
     }
 
 private:
@@ -37,8 +37,10 @@ private:
 
     // Last point
     double last_x_, last_y_, last_z_;
-    bool has_last_;
-
+    bool is_first_;
+    double yaw = 0.0;
+    tf::Quaternion q;
+        
     void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         if (msg->status.status < sensor_msgs::NavSatStatus::STATUS_FIX) {
             ROS_WARN_THROTTLE(5, "No GPS fix yet");
@@ -53,37 +55,34 @@ private:
         ecefToENU(Xp, Yp, Zp, x, y, z);
 
         // Filter large jumps
-        if (has_last_) {
-            double dx = x - last_x_;
-            double dy = y - last_y_;
-            double dz = z - last_z_;
-            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-            if (dist > 100.0) {
-                ROS_WARN_THROTTLE(5, "Skipping large odometry jump: %.1f meters", dist);
-                return;
-            }
+        if (is_first_) {
+            last_x_ = x;
+            last_y_ = y;
+            last_z_ = z;
+            is_first_ = false;
+            return;
         }
 
+        double dx = x - last_x_;
+        double dy = y - last_y_;
+        double dz = z - last_z_;
+        double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist > 100.0) {
+            ROS_WARN_THROTTLE(5, "Skipping large odometry jump: %.1f meters", dist);
+            return;
+        }
         // Estimate heading (yaw)
-        double yaw = 0.0;
-        if (has_last_) {
-            double dx = x - last_x_;
-            double dy = y - last_y_;
-            if (std::hypot(dx, dy) > 1e-2) {
-                yaw = std::atan2(dy, dx);
-            }
-            ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
-
+        if (std::hypot(dx, dy) > 1e-2) {
+            yaw = std::atan2(dy, dx);
         }
+        // ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
 
         // Update last position
         last_x_ = x;
         last_y_ = y;
         last_z_ = z;
-        has_last_ = true;
-
+        
         // Create quaternion from yaw
-        tf::Quaternion q;
         q.setRPY(0, 0, yaw);
         q.normalize();
 
