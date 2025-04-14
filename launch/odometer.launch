@@ -8,7 +8,12 @@
   <node name="gps_path_node" pkg="first_project" type="gps_path_publisher" output="screen" />
 
   <!-- Odometer from GPS -->
-  <node name="gps_odom_node" pkg="first_project" type="gps_odometer" output="screen" />
+  <node name="gps_odom_node" pkg="first_project" type="gps_odometer" output="screen">
+    <param name="lat_r" value="45.618932386592405" />
+    <param name="lon_r" value="9.281178887031235" />
+    <param name="alt_r" value="229.04906147731415" />
+    <!-- param name="alt_r" value="229.04906147731415" -->
+  </node>
   
   <!-- RViz -->
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/odom_view.rviz" />

@@ -7,9 +7,16 @@
 class GpsOdometer {
 public:
     GpsOdometer(ros::NodeHandle& nh) {
+        // Load parameters from launch file
+        nh.param("lat_r", lat_ref_, 0.0);
+        nh.param("lon_r", lon_ref_, 0.0);
+        nh.param("alt_r", alt_ref_, 0.0);
+
+        geodeticToECEF(lat_ref_, lon_ref_, alt_ref_, Xr_, Yr_, Zr_);
+        ROS_INFO("Reference set from parameters: lat=%.6f lon=%.6f alt=%.2f", lat_ref_, lon_ref_, alt_ref_);
+
         fix_sub_ = nh.subscribe("/swiftnav/front/gps_pose", 1, &GpsOdometer::gpsCallback, this);
         odom_pub_ = nh.advertise<nav_msgs::Odometry>("/gps_odom", 1);
-        has_reference_ = false;
     }
 
 private:
@@ -17,7 +24,7 @@ private:
     ros::Publisher odom_pub_;
     tf::TransformBroadcaster tf_broadcaster_;
 
-    bool has_reference_;
+    // Reference point
     double lat_ref_, lon_ref_, alt_ref_;
     double Xr_, Yr_, Zr_;
 
@@ -26,31 +33,13 @@ private:
             ROS_WARN_THROTTLE(5, "No GPS fix yet");
             return;
         }
-    
-        double lat = msg->latitude;
-        double lon = msg->longitude;
-        double alt = msg->altitude;
-    
+
         double Xp, Yp, Zp;
-        geodeticToECEF(lat, lon, alt, Xp, Yp, Zp);
-    
-        // Only initialize reference point and return
-        if (!has_reference_) {
-            lat_ref_ = lat;
-            lon_ref_ = lon;
-            alt_ref_ = alt;
-            Xr_ = Xp;
-            Yr_ = Yp;
-            Zr_ = Zp;
-            has_reference_ = true;
-            ROS_INFO("Reference set: lat=%.6f lon=%.6f alt=%.2f", lat_ref_, lon_ref_, alt_ref_);
-            return;  // <<< DO NOT CONTINUE TO PUBLISH
-        }
-    
-        // Process ENU only after ref is set
+        geodeticToECEF(msg->latitude, msg->longitude, msg->altitude, Xp, Yp, Zp);
+
         double x, y, z;
         ecefToENU(Xp, Yp, Zp, x, y, z);
-    
+
         nav_msgs::Odometry odom;
         odom.header.stamp = msg->header.stamp;
         odom.header.frame_id = "odom";
@@ -58,18 +47,18 @@ private:
         odom.pose.pose.position.x = x;
         odom.pose.pose.position.y = y;
         odom.pose.pose.position.z = z;
-        odom.pose.pose.orientation.w = 1.0;
-    
+        odom.pose.pose.orientation.w = 1.0; // no heading yet
+
         odom_pub_.publish(odom);
-    
+
         tf::Transform transform;
         transform.setOrigin(tf::Vector3(x, y, z));
         tf::Quaternion q;
-        q.setRPY(0, 0, 0);
+        q.setRPY(0, 0, 0);  // no heading yet
         transform.setRotation(q);
         tf_broadcaster_.sendTransform(tf::StampedTransform(transform, msg->header.stamp, "odom", "gps"));
     }
-    
+
     void geodeticToECEF(double lat, double lon, double alt, double& X, double& Y, double& Z) {
         double a = 6378137.0;
         double b = 6356752.0;
