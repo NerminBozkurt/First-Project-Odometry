@@ -1,0 +1,47 @@
+<launch>
+<!-- PARAMETERS FOR ODOMETER NODE -->
+    <param name="steeringfactor" value="28.0" />
+    <param name="wheelbase" value="1.765" />
+    <param name="integraltype" value="1" />
+    <param name="omega_threshold" value="0.03" />
+    <param name="v_threshold" value="10.0" />
+    <param name="alpha" value="1.0" />
+    <param name="alphaoffset" value="0.5" />
+    <param name="windowsize" value="100.0" />
+    <param name="variancethreshold" value="1.5" />
+    <param name="curvethreshold" value="40.0" />
+    <param name="postcurvesuppressiontime" value="3.0" />
+
+<!-- PARAMETERS FOR SECTOR_TIMES NODE -->
+    <param name="sector1_end/lat" value="45.63011592186994" />
+    <param name="sector1_end/lon" value="9.29068838335169" />
+    <param name="sector2_end/lat" value="45.62342108025827" />
+    <param name="sector2_end/lon" value="9.286983873232417" />
+    <param name="sector3_end/lat" value="45.61489875215231" />
+    <param name="sector3_end/lon" value="9.28072279690105" />
+    <param name="finish/lat" value="45.61893525020774" />
+    <param name="finish/lon" value="9.281147089393084" />
+    <param name="defaultmaxdistth" value="5.0" />
+    <param name="mindistth" value="0.2" />
+    <param name="boundaryradius" value="5.0" />
+
+
+  <!-- Play your bag file with simulated time -->
+  
+  <arg name="bag_file" default="$(env HOME)/data/project.bag"/>
+  <param name="use_sim_time" value="true"/>
+
+  <node name="bag_play" pkg="rosbag" type="play" args="--clock -r 12 $(arg bag_file)" />
+  
+  <!-- Run your odometer node -->
+  <node name="odometer" pkg="robot_pkg" type="odometer" output="screen" />
+
+  <!-- Run the sector_times node -->
+  <node name="sector_times" pkg="robot_pkg" type="sector_times" output="screen" />
+
+  <!-- Run RViz with pre-configured config file -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robot_pkg)/rviz/odometry_view.rviz" />
+
+  <!-- run rqt plot with the variance topic-->
+  <!-- <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot" args="/variance/data" /> -->
+</launch>
