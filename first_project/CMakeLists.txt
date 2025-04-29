@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   tf
   message_generation
+  sensor_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -135,8 +136,10 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(odometer src/odometer.cpp)
 add_executable(sector_times src/sector_times.cpp)
+add_executable(gps_odometer src/gps_odometer.cpp)
 target_link_libraries(odometer ${catkin_LIBRARIES})
 target_link_libraries(sector_times ${catkin_LIBRARIES})
+target_link_libraries(gps_odometer ${catkin_LIBRARIES})
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

@@ -11,7 +11,7 @@
 
 class OdometerNode {
 public:
-    OdometerNode(ros::NodeHandle& nh) : nh_(nh), x_(0.0), y_(0.0), theta_(0.0), is_first_msg_(true) {
+    OdometerNode(ros::NodeHandle& nh) : nh_(nh), x_(0.0), y_(0.0), theta_(90 * M_PI / 180.0), is_first_msg_(true) {
         nh_.param("wheelbase", L_, 1.765); // default wheelbase = 1.765 m
         nh_.param("steeringfactor", steer_fac_, 30.0);
         nh_.param("integraltype", INTEGRAL_TYPE, 1);

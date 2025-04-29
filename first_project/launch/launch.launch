@@ -11,6 +11,7 @@
     <param name="variancethreshold" value="1.5" />
     <param name="curvethreshold" value="40.0" />
     <param name="postcurvesuppressiontime" value="3.0" />
+    <param name="initial_yaw_deg" value="90.0"/>
 
 <!-- PARAMETERS FOR SECTOR_TIMES NODE -->
     <param name="sector1_end/lat" value="45.63011592186994" />
@@ -31,7 +32,9 @@
   <arg name="bag_file" default="$(env HOME)/data/project.bag"/>
   <param name="use_sim_time" value="true"/>
 
-  <node name="bag_play" pkg="rosbag" type="play" args="--clock -r 12 $(arg bag_file)" />
+  <node name="bag_play" pkg="rosbag" type="play" args="--clock -r 30 $(arg bag_file)" />
+
+  <node name="gps_odometer" pkg ="first_project" type="gps_odometer" output="screen" />
   
   <!-- Run your odometer node -->
   <node name="odometer" pkg="first_project" type="odometer" output="screen" />

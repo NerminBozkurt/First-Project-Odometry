@@ -9,7 +9,10 @@
 
 class GpsOdometer {
 public:
-    GpsOdometer(ros::NodeHandle& nh) {
+    GpsOdometer(ros::NodeHandle& nh)
+      : origin_set_(false)
+    {
+        // Reference geodetic origin
         nh.param("lat_r", lat_ref_, 0.0);
         nh.param("lon_r", lon_ref_, 0.0);
         nh.param("alt_r", alt_ref_, 0.0);
@@ -25,17 +28,25 @@ public:
     }
 
 private:
+    // ROS interfaces
     ros::Subscriber fix_sub_;
     ros::Publisher odom_pub_;
     ros::Publisher path_pub_;
     tf::TransformBroadcaster tf_broadcaster_;
     nav_msgs::Path path_;
 
-    // Reference point
+    // Geodetic reference
     double lat_ref_, lon_ref_, alt_ref_;
     double Xr_, Yr_, Zr_;
 
-    // Last point
+    // Origin and normalization
+    bool origin_set_;
+    double base_x_, base_y_, base_z_;
+    const double norm_x_ = 14.82;
+    const double norm_y_ = 0.0;
+    const double norm_z_ = 0.0;
+
+    // Last position for filtering and heading
     double last_x_, last_y_, last_z_;
     bool has_last_;
 
@@ -49,22 +60,36 @@ private:
         double Xp, Yp, Zp;
         geodeticToECEF(msg->latitude, msg->longitude, msg->altitude, Xp, Yp, Zp);
 
-        double x, y, z;
-        ecefToENU(Xp, Yp, Zp, x, y, z);
+        double x_raw, y_raw, z_raw;
+        ecefToENU(Xp, Yp, Zp, x_raw, y_raw, z_raw);
+
+        // Set origin on first valid measurement
+        if (!origin_set_) {
+            base_x_ = x_raw;
+            base_y_ = y_raw;
+            base_z_ = z_raw;
+            origin_set_ = true;
+            ROS_INFO("Origin set at ENU raw = {%.3f, %.3f, %.3f}", base_x_, base_y_, base_z_);
+        }
+
+        // Normalize so that starting point maps to (14.82, 0, 0)
+        double x = x_raw - base_x_ + norm_x_;
+        double y = y_raw - base_y_ + norm_y_;
+        double z = z_raw - base_z_ + norm_z_;
 
         // Filter large jumps
         if (has_last_) {
             double dx = x - last_x_;
             double dy = y - last_y_;
             double dz = z - last_z_;
-            double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+            double dist = std::sqrt(dx*dx + dy*dy + dz*dz);
             if (dist > 100.0) {
                 ROS_WARN_THROTTLE(5, "Skipping large odometry jump: %.1f meters", dist);
                 return;
             }
         }
 
-        // Estimate heading (yaw)
+        // Estimate heading
         double yaw = 0.0;
         if (has_last_) {
             double dx = x - last_x_;
@@ -73,16 +98,15 @@ private:
                 yaw = std::atan2(dy, dx);
             }
             ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
-
         }
 
-        // Update last position
+        // Update last for next iteration
         last_x_ = x;
         last_y_ = y;
         last_z_ = z;
         has_last_ = true;
 
-        // Create quaternion from yaw
+        // Build quaternion
         tf::Quaternion q;
         q.setRPY(0, 0, yaw);
         q.normalize();
@@ -116,40 +140,42 @@ private:
         path_pub_.publish(path_);
     }
 
-    void geodeticToECEF(double lat, double lon, double alt, double& X, double& Y, double& Z) {
-        double a = 6378137.0;
-        double b = 6356752.0;
-        double e_sq = 1 - (b * b) / (a * a);
+    void geodeticToECEF(double lat, double lon, double alt,
+                        double& X, double& Y, double& Z) {
+        const double a = 6378137.0;
+        const double b = 6356752.0;
+        const double e_sq = 1 - (b*b)/(a*a);
+        
+        double phi = lat * M_PI/180.0;
+        double lambda = lon * M_PI/180.0;
+        double sinphi = sin(phi), cosphi = cos(phi);
+        double sinl = sin(lambda), cosl = cos(lambda);
+        double N = a / std::sqrt(1 - e_sq*sinphi*sinphi);
 
-        double phi = lat * M_PI / 180.0;
-        double lambda = lon * M_PI / 180.0;
-        double sin_phi = sin(phi), cos_phi = cos(phi);
-        double sin_lambda = sin(lambda), cos_lambda = cos(lambda);
-        double N = a / sqrt(1 - e_sq * sin_phi * sin_phi);
-
-        X = (N + alt) * cos_phi * cos_lambda;
-        Y = (N + alt) * cos_phi * sin_lambda;
-        Z = (N * (1 - e_sq) + alt) * sin_phi;
+        X = (N + alt) * cosphi * cosl;
+        Y = (N + alt) * cosphi * sinl;
+        Z = (N*(1 - e_sq) + alt) * sinphi;
     }
 
-    void ecefToENU(double Xp, double Yp, double Zp, double& x, double& y, double& z) {
-        double phi = lat_ref_ * M_PI / 180.0;
-        double lambda = lon_ref_ * M_PI / 180.0;
-        double sin_phi = sin(phi), cos_phi = cos(phi);
-        double sin_lambda = sin(lambda), cos_lambda = cos(lambda);
+    void ecefToENU(double Xp, double Yp, double Zp,
+                   double& x, double& y, double& z) {
+        double phi = lat_ref_ * M_PI/180.0;
+        double lambda = lon_ref_ * M_PI/180.0;
+        double sinphi = sin(phi), cosphi = cos(phi);
+        double sinl = sin(lambda), cosl = cos(lambda);
 
         double dx = Xp - Xr_;
         double dy = Yp - Yr_;
         double dz = Zp - Zr_;
 
-        x = -sin_lambda * dx + cos_lambda * dy;
-        y = -sin_phi * cos_lambda * dx - sin_phi * sin_lambda * dy + cos_phi * dz;
-        z = cos_phi * cos_lambda * dx + cos_phi * sin_lambda * dy + sin_phi * dz;
+        x = -sinl*dx + cosl*dy;
+        y = -sinphi*cosl*dx - sinphi*sinl*dy + cosphi*dz;
+        z = cosphi*cosl*dx + cosphi*sinl*dy + sinphi*dz;
     }
 };
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "gps_odometer");
+    ros::init(argc, argv, "gps_odometer_normalized");
     ros::NodeHandle nh("~");
     GpsOdometer node(nh);
     ros::spin();
