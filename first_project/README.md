@@ -6,20 +6,15 @@ calistrimak icin :
 roslaunch first_project launch.launch
 
 --------------------------------------//-------------------------------
-Yuklediklerim:
-odometer_emre.cpp
-sector_times.cpp
-nodes1-3launch.launch
-odometry_view.rviz
+This package has three nodes:
+odometer.cpp
+gps_odometer.cpp
+sector_times.launch
 
-Paket ismi her yerde robot_pkg, cunku benim paket ismim bu. Bunu yukledigim launch'da ve kendi cmake'inizde kendi paket ismine donusturerek node'lari calistirabilirsiniz.
+odometer node reads speed values and does dead reckoning odometry. Euler, runge kutta, or exact integration method is selectable via parameters. Steering angle readings are filtered before using to stabilize straight paths and sharp curves, with the tuning parameters also adjustable in the launch file. This node reads from "/speedsteer", publishes odometry message into "/odom", and broadcasts the TF.
 
-odometer_emre.cpp dosyasini odometer.cpp olarak rename'leyin, nodes1-3launch.launch'da o sekilde geciyor. Veya launch ve cmakelists'inizde ismini degisirsiniz.
+gps_odometer node reads front gps values and computes the distance to generate the pose of the car. Reads from "/swiftnav/front/gps_pose", publishes odometry message into "/gps_odom", and broadcasts the TF.
 
-launch'u baslatinca bag'i oynatiyor, rviz acip odometry'yi sim time'da ciziyor, ve bir yandan yeni bir command'de rostopic echo /sector_times bunu echo'larsaniz her sector bittiginde mesaj publish ediyor.
+sector_times node reads from "/swiftnav/front/gps_pose" and "/speedsteer". The sector points are given via parameters as Latitude,Longitude pairs in launch. It also takes distance parameters in launch for the detection of sector boundary crossings. This node synchronizes the speed and gps readings using message filters, detects the sectors, and computes the total sector time with the mean speed of the sector. It publishes a custom message "sector_times", containing the current sector, the time elapsed and the mean speed so far in the current sector, into the "/sector_times" topic at a 1 Hz frequency with a timer.  
 
-launch, rviz'i yukledigim odometry_view.rviz config'i ile aciyor.
-
-sector_times node'unda iki sekilde mean speed verdim, sector_times mesajina publish edilen mean speed, gps'ten her sector icin mesafe hesaplayip sector suresine bolunerek elde edilen mean speed.
-Bir de speedsteer topic'inden aldigim speed degerlerini her sector icin birbirine ekleyip toplam deger sayisina bolerek mean speed elde ettim. Bunu node direkt kendi terminaline ROS_WARN ile yaziyor, launch'u baslattiginiz terminalde yazacak.
-speedsteer ile gps mesajlarini senkronize etmedim, ikinci yontemle elde edilen mean speed icin senkronize etmek biraz daha iyi olabilir (message_filter ile), bunu konusalim. Ama anladigim kadariyla bag file zaten tum mesajlari kronolojik oynatiyor bu yuzden senkronize gercekten gerekli mi bilmiyorum.
+launch.launch file sets the parameters, launches rviz with the configuration loaded from odometry_view.rviz file.
