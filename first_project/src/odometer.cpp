@@ -15,10 +15,7 @@ public:
         nh_.param("wheelbase", L_, 1.765); // default wheelbase = 1.765 m
         nh_.param("steeringfactor", steer_fac_, 30.0);
         nh_.param("integraltype", INTEGRAL_TYPE, 1);
-        nh_.param("omega_threshold", omega_th_, 0.0);
-        nh_.param("v_threshold", v_th_, 50.0);
         nh_.param("alpha", alpha_, 0.0);
-        nh_.param("alphaoffset", alpha_offset_, 0.0);
         nh_.param("windowsize", win_size_double, 0.0);
         nh_.param("variancethreshold", variance_threshold_, 0.0);
         nh_.param("curvethreshold", curve_threshold_, 9.0);
@@ -57,11 +54,7 @@ private:
     int INTEGRAL_TYPE;
 
     double smoothed_omega = 0.0;
-    double omega_th_;
-    double v_th_;
     double alpha_;  // smoothing factor between 0 and 1 for omega
-    double alpha_offset_; // adaptive offset function's alpha
-    double offset_ = 0;
     ros::Time last_time_;
 
     // Sliding window data and parameters
@@ -135,19 +128,6 @@ private:
     {
         smoothed_omega = alpha_* omega + (1 - alpha_) * smoothed_omega;
         return smoothed_omega;
-    }
-
-    double adaptiveOffsetSteering(double omega, double v, double delta)
-    {
-        // Adaptive offset update: only update when conditions indicate the vehicle is going straight.
-        double foovar;
-        if (isLowVariancePath(delta, &foovar))//fabs(omega) < omega_th_ && v > v_th_)
-        { 
-            offset_ = alpha_offset_ * delta + (1.0 - alpha_offset_) * offset_;
-        }
-        //ROS_INFO("CURRENT OFFSET: %4.f", offset_);
-        double delta_corr = delta - offset_;
-        return delta_corr;
     }
 
     void callback(const geometry_msgs::PointStamped::ConstPtr& msg) {
