@@ -76,6 +76,7 @@ private:
   GpsPoint    s1_, s2_, s3_, finish_;
 
   // state
+  ros::Time now;
   int         current_sector_;
   ros::Time   sector_start_time_, wrap_time_;
   double      total_sector_dist_, current_speed_sum_;
@@ -118,7 +119,7 @@ private:
     speedCount_++;
 
     GpsPoint cur{gps_msg->latitude, gps_msg->longitude};
-    ros::Time now = gps_msg->header.stamp;
+    now = gps_msg->header.stamp;
 
     if (is_first_message_) {
       last_gps_.point.x  = cur.lat;
@@ -179,7 +180,7 @@ private:
   }
 
   void timerCb(const ros::TimerEvent&) {
-    ros::Time now = ros::Time::now();
+  
     double elapsed_sec, mean_speed;
 
     if (current_sector_ == 1 && saved1_vals_ && wrap_occurred_) {
