@@ -42,7 +42,7 @@ private:
     // Origin and normalization
     bool origin_set_;
     double base_x_, base_y_, base_z_;
-    const double norm_x_ = 14.82;
+    const double norm_x_ = 0.0;
     const double norm_y_ = 0.0;
     const double norm_z_ = 0.0;
 
