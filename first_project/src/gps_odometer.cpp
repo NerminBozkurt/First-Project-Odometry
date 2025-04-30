@@ -97,7 +97,7 @@ private:
             if (std::hypot(dx, dy) > 1e-2) {
                 yaw = std::atan2(dy, dx);
             }
-            ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
+            //ROS_INFO_THROTTLE(1, "dx=%.2f dy=%.2f → yaw=%.2f deg", dx, dy, yaw * 180.0 / M_PI);
         }
 
         // Update last for next iteration
