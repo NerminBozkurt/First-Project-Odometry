@@ -25,26 +25,9 @@
     <param name="defaultmaxdistth" value="5.0" />
     <param name="mindistth" value="0.2" />
     <param name="boundaryradius" value="5.0" />
-
-
-  <!-- Play your bag file with simulated time -->
-  
-  <arg name="bag_file" default="$(env HOME)/data/project.bag"/>
-  <param name="use_sim_time" value="true"/>
-
-  <node name="bag_play" pkg="rosbag" type="play" args="--clock -r 30 $(arg bag_file)" />
-
+    
   <node name="gps_odometer" pkg ="first_project" type="gps_odometer" output="screen" />
-  
-  <!-- Run your odometer node -->
   <node name="odometer" pkg="first_project" type="odometer" output="screen" />
-
-  <!-- Run the sector_times node -->
   <node name="sector_times" pkg="first_project" type="sector_times" output="screen" />
-
-  <!-- Run RViz with pre-configured config file -->
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/odometry_view.rviz" />
-
-  <!-- run rqt plot with the variance topic-->
-  <!-- <node pkg="rqt_plot" type="rqt_plot" name="rqt_plot" args="/variance/data" /> -->
 </launch>

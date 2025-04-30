@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   message_generation
   sensor_msgs
+  message_filters
 )
 
 ## System dependencies are found with CMake's conventions
