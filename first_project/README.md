@@ -3,7 +3,11 @@ Perception, Localization and Mapping for Mobile Robots Course Project
 This package has three nodes:
 odometer.cpp
 gps_odometer.cpp
-sector_times.launch
+sector_times.cpp
+
+and a launch file with rviz configuration
+launch.launch
+odometry_view.rviz
 
 odometer node reads speed values and does dead reckoning odometry. Euler, runge kutta, or exact integration method is selectable via parameters. Steering angle readings are filtered before using to stabilize straight paths and sharp curves, with the tuning parameters also adjustable in the launch file. This node reads from "/speedsteer", publishes odometry message into "/odom", and broadcasts the TF.
 
