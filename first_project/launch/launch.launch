@@ -1,17 +1,13 @@
 <launch>
 <!-- PARAMETERS FOR ODOMETER NODE -->
-    <param name="steeringfactor" value="28.0" />
+    <param name="steeringfactor" value="32.0" />
     <param name="wheelbase" value="1.765" />
     <param name="integraltype" value="1" />
-    <param name="omega_threshold" value="0.03" />
-    <param name="v_threshold" value="10.0" />
     <param name="alpha" value="1.0" />
-    <param name="alphaoffset" value="0.5" />
     <param name="windowsize" value="100.0" />
     <param name="variancethreshold" value="1.5" />
     <param name="curvethreshold" value="40.0" />
     <param name="postcurvesuppressiontime" value="3.0" />
-    <param name="initial_yaw_deg" value="90.0"/>
 
 <!-- PARAMETERS FOR SECTOR_TIMES NODE -->
     <param name="sector1_end/lat" value="45.63011592186994" />
@@ -25,11 +21,12 @@
     <param name="defaultmaxdistth" value="5.0" />
     <param name="mindistth" value="0.2" />
     <param name="boundaryradius" value="5.0" />
-
-
-  <param name="use_sim_time" value="true"/>
+    
+    <param name="use_sim_time" value="true"/>
+  
   <node name="gps_odometer" pkg ="first_project" type="gps_odometer" output="screen" />
   <node name="odometer" pkg="first_project" type="odometer" output="screen" />
   <node name="sector_times" pkg="first_project" type="sector_times" output="screen" />
   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find first_project)/rviz/odometry_view.rviz" />
+
 </launch>
