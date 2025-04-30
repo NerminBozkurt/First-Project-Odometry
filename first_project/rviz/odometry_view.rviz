@@ -69,7 +69,7 @@ Visualization Manager:
         vehicle:
           Value: true
       Marker Alpha: 1
-      Marker Scale: 25
+      Marker Scale: 350.0
       Name: TF
       Show Arrows: true
       Show Axes: true
@@ -86,7 +86,7 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz/Path
       Color: 25; 255; 0
-      Enabled: false
+      Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
@@ -105,7 +105,7 @@ Visualization Manager:
       Shaft Length: 0.10000000149011612
       Topic: /odom_path
       Unreliable: false
-      Value: false
+      Value: true
     - Angle Tolerance: 0.10000000149011612
       Class: rviz/Odometry
       Covariance:
@@ -124,7 +124,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 5
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Queue Size: 10
@@ -133,10 +133,10 @@ Visualization Manager:
         Axes Length: 1
         Axes Radius: 0.10000000149011612
         Color: 0; 0; 255
-        Head Length: 0.30000001192092896
-        Head Radius: 1
-        Shaft Length: 2
-        Shaft Radius: 2
+        Head Length: 20.0
+        Head Radius: 30.0
+        Shaft Length: 30.0
+        Shaft Radius: 10.0
         Value: Arrow
       Topic: /odom
       Unreliable: false
@@ -159,7 +159,7 @@ Visualization Manager:
           Value: true
         Value: true
       Enabled: true
-      Keep: 100
+      Keep: 5
       Name: Odometry
       Position Tolerance: 0.10000000149011612
       Queue Size: 10
@@ -168,10 +168,10 @@ Visualization Manager:
         Axes Length: 1
         Axes Radius: 0.10000000149011612
         Color: 255; 0; 0
-        Head Length: 0.30000001192092896
-        Head Radius: 1
-        Shaft Length: 2
-        Shaft Radius: 2
+        Head Length: 20.0
+        Head Radius: 30.0
+        Shaft Length: 30.0
+        Shaft Radius: 10.0
         Value: Arrow
       Topic: /gps_odom
       Unreliable: false
