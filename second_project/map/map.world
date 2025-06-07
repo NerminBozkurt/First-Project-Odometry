@@ -1,0 +1,18 @@
+define floorplan model (
+  bitmap "map.png"             # your environment image
+  size_x 100.0                     # map size in meters
+  size_y 100.0
+  resolution 0.03
+)
+
+# include a robot model (you can copy one from stage/worlds/*.inc)
+include "robot.inc"
+
+# spawn it at x=1, y=1, heading=0
+model
+(
+  name "robot"
+  pose [1 1 0]
+  init_pose [1 1 0]
+  include "robot.inc"
+)

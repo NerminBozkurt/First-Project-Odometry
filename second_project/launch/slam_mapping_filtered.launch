@@ -1,0 +1,31 @@
+<launch>
+  <!-- 0) Sim time (for bags) -->
+  <param name="use_sim_time" value="true"/>
+
+  <!-- Play the bag immediately, publishing /clock -->
+  <node pkg="rosbag" type="play" name="play_bag" output="screen"
+        args="--clock --rate 10.0 $(find second_project)/../../../data/robotics2.bag" />
+
+  <!-- 1) static TF from sick_back (now sees /clock) -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="sick_back_broadcaster"
+        args="-0.3 0.0 0.115  0.0 3.14159 0.0  base_link sick_back"/>
+
+  <!-- 2) Your odom→TF, filter, scan_merge, SLAM, RViz, etc. -->
+  <node pkg="second_project" type="odom_to_tf"    name="odom_to_tf"    output="screen"/>
+  <node pkg="second_project" type="odom_filter"    name="odom_filter"  output="screen"/>
+  <node pkg="second_project" type="scan_merger"   name="scan_merger"  output="screen">
+    <param name="topic_front"  value="/scan_front"/>
+    <param name="topic_back"   value="/scan_back"/>
+    <param name="output_topic" value="/scan_merged"/>
+    <param name="base_frame"   value="base_link"/>
+  </node>
+  <node pkg="slam_toolbox" type="async_slam_toolbox_node" name="slam_toolbox" output="screen">
+    <rosparam command="load" file="$(find second_project)/config/mapper_params_online_async.yaml"/>
+  </node>
+  <node pkg="rviz" type="rviz" name="rviz" output="screen"
+        args="-d $(find second_project)/rviz/mapping.rviz"/>
+
+  <!-- 3) Record filtered outputs (optional) -->
+  <node pkg="rosbag" type="record" name="record_all_scans" output="screen"
+        args="-O /home/robotics/data/slam_scans1.bag /clock /map /scan_front /scan_back /scan_merged /tf /tf_static /odom_filtered" />
+</launch>
